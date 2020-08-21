@@ -75,7 +75,7 @@ namespace Assets.WasapiAudio.Scripts.Unity
         }
 
         // Update is called once per frame
-        void FixedUpdate()
+        void Update()
         {
             moveCamera();
 
