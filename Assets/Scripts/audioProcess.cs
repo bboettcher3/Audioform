@@ -75,9 +75,11 @@ namespace Assets.WasapiAudio.Scripts.Unity
         }
 
         // Update is called once per frame
-        void Update()
+        void FixedUpdate()
         {
             moveCamera();
+
+            RenderSettings.skybox.SetFloat("_Rotation", Time.time * 0.6f);
 
             // Clean up unseen verts and tris
             if (m_curZ > maxRows)
