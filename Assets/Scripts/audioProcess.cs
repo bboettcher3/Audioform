@@ -29,6 +29,8 @@ namespace Assets.WasapiAudio.Scripts.Unity
         public float xSpacing;
         [Header("Spacing between rows of vertices")]
         public float zSpacing;
+        [Header("Camera FOV Scale Factor")]
+        public float fovScale;
 
         private List<Vector3> m_vertices;
         private List<int> m_triangles;
@@ -38,6 +40,7 @@ namespace Assets.WasapiAudio.Scripts.Unity
         private int m_trueWidth;
         private int m_rowWidth;
         private float[] m_spectrumData;
+        private float m_curRms;
 
         public void Awake()
         {
@@ -71,7 +74,7 @@ namespace Assets.WasapiAudio.Scripts.Unity
             m_triangles = new List<int>();
             m_colors = new List<Color>();
 
-
+            m_curRms = 0;
         }
 
         // Update is called once per frame
@@ -103,7 +106,7 @@ namespace Assets.WasapiAudio.Scripts.Unity
                 for (int i = 0; i < m_rowWidth; i++)
                 {
                     float prevAmp = m_vertices[(m_rowWidth * (curRow - 1)) + i].y / ampScaleFactor;
-                    m_spectrumData[i] = Mathf.Lerp(prevAmp, m_spectrumData[i], Time.deltaTime * 10);
+                    m_spectrumData[i] = Mathf.Lerp(prevAmp, m_spectrumData[i], .2F);
                 }
             }
 
@@ -161,7 +164,9 @@ namespace Assets.WasapiAudio.Scripts.Unity
         private Color getRainbowColor(float value)
         {
             /*convert to long rainbow RGB*/
-            float a = (1.0f - value) * 6;
+            value += m_curRms;
+            value = value % 1.0F;
+            float a = (1.0F - value) * 6;
             int X = (int)Mathf.Floor(a);
             int Y = (int)Mathf.Floor(a - X);
             float r, g, b;
@@ -250,6 +255,33 @@ namespace Assets.WasapiAudio.Scripts.Unity
         private void moveCamera()
         {
             Camera.main.transform.parent.Translate(new Vector3(0, 0, 1) * zSpacing);
+            float newRms = rmsValue();
+            Mathf.Lerp(m_curRms, newRms, 0.2F);
+            Camera.main.fieldOfView = 60.0F + (newRms * fovScale);
+            m_curRms = newRms;
+        }
+
+        // Function that Calculate Root Mean Square of spectrum data
+        private float rmsValue()
+        {
+            float square = 0;
+            float mean = 0;
+            float root = 0;
+            int n = m_rowWidth / 2;
+
+            // Calculate square. 
+            for (int i = 0; i < n; i++)
+            {
+                square += Mathf.Pow(m_spectrumData[i], 2);
+            }
+
+            // Calculate Mean. 
+            mean = (square / (float)(n));
+
+            // Calculate Root. 
+            root = Mathf.Sqrt(mean);
+
+            return root;
         }
 
     }
