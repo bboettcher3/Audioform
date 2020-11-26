@@ -17,7 +17,7 @@ namespace Assets.WasapiAudio.Scripts.Unity
         private WasapiCaptureType CaptureType = WasapiCaptureType.Loopback;
         private ScalingStrategy ScalingStrategy = ScalingStrategy.Linear;
         private int MinFrequency = 80;
-        private int MaxFrequency = 20000;
+        private int MaxFrequency = 5000;
 
         public int maxRows;
         [Header("Number of FFT samples to take")]
@@ -25,20 +25,17 @@ namespace Assets.WasapiAudio.Scripts.Unity
         [Header("Amp scale factor")]
         public float ampScaleFactor;
         public bool smoothPeaks;
-        [Header("Spacing between sample vertices")]
-        public float xSpacing;
         [Header("Spacing between rows of vertices")]
         public float zSpacing;
         [Header("Camera FOV Scale Factor")]
         public float fovScale;
 
         private List<Vector3> m_vertices;
+        private List<float> m_amplitudes;
         private List<int> m_triangles;
         private int m_curZ;
         private float m_xLeft;
-        private int m_divFactor;
         private int m_trueWidth;
-        private int m_rowWidth;
         private float[] m_spectrumData;
         private float m_curRms;
 
@@ -56,21 +53,19 @@ namespace Assets.WasapiAudio.Scripts.Unity
         // Start is called before the first frame update
         void Start()
         {
-            m_divFactor = 3;
-            m_trueWidth = width / m_divFactor;
-            m_rowWidth = m_trueWidth * 2;
-
             // Init mesh
             m_meshFilter = GetComponent<MeshFilter>();
             m_mesh = new Mesh();
+            m_mesh.MarkDynamic();
             m_mesh.name = "spectrogram";
             m_meshFilter.mesh = m_mesh;
 
             // Find leftmost x point centered around 0
-            m_xLeft = 0 - (xSpacing * m_trueWidth);
             m_curZ = 0;
+            m_trueWidth = width / 2;
 
             m_vertices = new List<Vector3>();
+            m_amplitudes = new List<float>();
             m_triangles = new List<int>();
             m_colors = new List<Color>();
 
@@ -90,10 +85,6 @@ namespace Assets.WasapiAudio.Scripts.Unity
                 removeOldRows();
             }
 
-            //float[] spectrum = new float[width];
-
-            //AudioListener.GetSpectrumData(spectrum, 0, FFTWindow.Rectangular);
-
             if (smoothPeaks)
             {
                 smoothArray(m_spectrumData);
@@ -103,10 +94,18 @@ namespace Assets.WasapiAudio.Scripts.Unity
             if (m_curZ > 0)
             {
                 int curRow = (m_curZ > maxRows) ? maxRows : m_curZ;
-                for (int i = 0; i < m_rowWidth; i++)
+                for (int i = 0; i < width; i++)
                 {
-                    float prevAmp = m_vertices[(m_rowWidth * (curRow - 1)) + i].y / ampScaleFactor;
-                    m_spectrumData[i] = Mathf.Lerp(prevAmp, m_spectrumData[i], .2F);
+                    if (i >= m_trueWidth)
+                    {
+                        int trueX = i - m_trueWidth;
+                        float prevAmp = m_amplitudes[(width * (curRow - 1)) + trueX];
+                        m_spectrumData[i] = Mathf.Lerp(prevAmp, m_spectrumData[trueX], .2F);
+                    } else
+                    {
+                        float prevAmp = m_amplitudes[(width * (curRow - 1)) + i];
+                        m_spectrumData[i] = Mathf.Lerp(prevAmp, m_spectrumData[i], .2F);
+                    }
                 }
             }
 
@@ -122,17 +121,17 @@ namespace Assets.WasapiAudio.Scripts.Unity
         private void generateVertices(float[] spectrum)
         {
             // Generate half of the normal vertices
-            for (int i = 0; i < m_trueWidth; i++)
+            for (int i = 0; i < width; i++)
             {
-                m_vertices.Add(calcVertex(i, spectrum[i]));
+                if (i < m_trueWidth)
+                {
+                    m_vertices.Add(calcVertex(i, spectrum[i]));
+                } else
+                {
+                    m_vertices.Add(calcVertex(i, spectrum[i - m_trueWidth]));
+                }
+                
             }
-
-            // Generate half of the flipped vertices
-            for (int i = 0; i < m_trueWidth; i++)
-            {
-                m_vertices.Add(calcFlippedVertex(i, spectrum[m_trueWidth - 1 - i]));
-            }
-
 
             m_mesh.vertices = m_vertices.ToArray();
         }
@@ -141,20 +140,18 @@ namespace Assets.WasapiAudio.Scripts.Unity
         {
             int curRow = m_curZ > maxRows ? maxRows : m_curZ;
 
-            float maxAmp = 1.0f; // Tweak this to get more/less colors
-            float scaleFactor = .004f;
-
-            // Start at new row, make triangles for new vertices
-            for (int vertexIndex = m_rowWidth * curRow, x = 0; x < m_rowWidth; x++, vertexIndex++)
+            // Start at new row, make colors for new vertices
+            for (int vertexIndex = width * curRow, x = 0; x < width; x++, vertexIndex++)
             {
-                float normAmp = m_vertices[vertexIndex].y / maxAmp;
+                float normAmp = m_amplitudes[vertexIndex];
                 int trueX = x;
                 if (x >= m_trueWidth)
                 {
-                    trueX = (m_rowWidth - 1) - x;
+                    trueX = x - m_trueWidth;
                 }
-                normAmp += (trueX * scaleFactor);
+                normAmp += 3 * (trueX / m_trueWidth);
                 normAmp = Mathf.Min(normAmp, 1.0f);
+                normAmp = Mathf.Max(0, normAmp);
                 m_colors.Add(getRainbowColor(normAmp));
             }
 
@@ -196,14 +193,14 @@ namespace Assets.WasapiAudio.Scripts.Unity
             int curRow = m_curZ > maxRows ? maxRows : m_curZ;
 
             // Start at new row, make triangles for new vertices
-            for (int vertexIndex = m_rowWidth * (curRow - 1), x = 0; x < m_rowWidth - 1; x++, vertexIndex++)
+            for (int vertexIndex = width * (curRow - 1), x = 0; x < width - 1; x++, vertexIndex++)
             {
                 m_triangles.Add(vertexIndex);
-                m_triangles.Add(vertexIndex + m_rowWidth);
+                m_triangles.Add(vertexIndex + width);
                 m_triangles.Add(vertexIndex + 1);
                 m_triangles.Add(vertexIndex + 1);
-                m_triangles.Add(vertexIndex + m_rowWidth);
-                m_triangles.Add(vertexIndex + m_rowWidth + 1);
+                m_triangles.Add(vertexIndex + width);
+                m_triangles.Add(vertexIndex + width + 1);
             }
 
             m_mesh.triangles = m_triangles.ToArray();
@@ -212,21 +209,35 @@ namespace Assets.WasapiAudio.Scripts.Unity
 
         private Vector3 calcVertex(int i, float amp)
         {
-            return new Vector3(m_xLeft + (xSpacing * i), amp * ampScaleFactor, m_curZ * zSpacing);
-        }
-        private Vector3 calcFlippedVertex(int i, float amp)
-        {
-            return new Vector3((xSpacing * i), amp * ampScaleFactor, m_curZ * zSpacing);
+            Vector3 v = new Vector3(0, 0, 0);
+            float cx = 0; float cy = 5;
+            float scaleFactor = 0.8f;
+            if (i < m_trueWidth)
+            {
+                scaleFactor += Mathf.Exp(i - m_trueWidth);
+            }
+            else
+            {
+                scaleFactor += Mathf.Exp((i - m_trueWidth) - m_trueWidth);
+            }
+            float radius = ampScaleFactor - (amp * scaleFactor * ampScaleFactor);
+            m_amplitudes.Add(amp); // Add amplitude to list
+            float angle = (i / (float)(width - 1)) * 2.0f * Mathf.PI + m_curZ * 0.002f;
+            angle = angle % (2 * Mathf.PI);
+            float x = cx + radius * Mathf.Cos(angle);
+            float y = cy + radius * Mathf.Sin(angle);
+            return new Vector3(x, y, m_curZ * zSpacing);
         }
 
         private void removeOldRows()
         {
-            m_vertices.RemoveRange(0, m_rowWidth);
-            m_colors.RemoveRange(0, m_rowWidth);
-            m_triangles.RemoveRange(0, 6 * (m_rowWidth - 1)); // 6 points per tile
+            m_vertices.RemoveRange(0, width);
+            m_amplitudes.RemoveRange(0, width);
+            m_colors.RemoveRange(0, width);
+            m_triangles.RemoveRange(0, 6 * (width - 1)); // 6 points per tile
             for (int i = 0; i < m_triangles.Count; i++)
             {
-                m_triangles[i] -= m_rowWidth;
+                m_triangles[i] -= width;
             }
         }
 
@@ -256,8 +267,8 @@ namespace Assets.WasapiAudio.Scripts.Unity
         {
             Camera.main.transform.parent.Translate(new Vector3(0, 0, 1) * zSpacing);
             float newRms = rmsValue();
-            Mathf.Lerp(m_curRms, newRms, 0.2F);
-            Camera.main.fieldOfView = 60.0F + (newRms * fovScale);
+            newRms = Mathf.Lerp(m_curRms, newRms, 0.2F);
+            //Camera.main.fieldOfView = 60.0F + (newRms * fovScale);
             m_curRms = newRms;
         }
 
@@ -267,7 +278,7 @@ namespace Assets.WasapiAudio.Scripts.Unity
             float square = 0;
             float mean = 0;
             float root = 0;
-            int n = m_rowWidth / 2;
+            int n = width;
 
             // Calculate square. 
             for (int i = 0; i < n; i++)
