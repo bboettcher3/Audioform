@@ -161,11 +161,12 @@ namespace Assets.WasapiAudio.Scripts.Unity
         private Color getRainbowColor(float value)
         {
             /*convert to long rainbow RGB*/
-            value += m_curRms;
+            value += m_curZ * 0.0001f;
+            //value += m_curRms;
             value = value % 1.0F;
             float a = (1.0F - value) * 6;
             int X = (int)Mathf.Floor(a);
-            int Y = (int)Mathf.Floor(a - X);
+            float Y = a - X;
             float r, g, b;
             switch (X)
             {
@@ -174,7 +175,7 @@ namespace Assets.WasapiAudio.Scripts.Unity
                 case 2: r = 0; g = 1; b = Y; break;
                 case 3: r = 0; g = 1 - Y; b = 1; break;
                 case 4: r = Y; g = 0; b = 1; break;
-                case 5: r = 1; g = 0; b = 1; break;
+                case 5: r = 1; g = 0; b = 1 - Y; break;
                 default:
                 {
                         r = 0; g = 0; b = 0; break;
