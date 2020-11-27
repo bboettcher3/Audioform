@@ -311,7 +311,7 @@ MonoBehaviour:
   width: 64
   ampScaleFactor: 10
   smoothPeaks: 0
-  zSpacing: 0.2
+  zSpacing: 0.1
   fovScale: 0
 --- !u!81 &178939300
 AudioListener:

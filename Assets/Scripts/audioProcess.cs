@@ -278,7 +278,7 @@ namespace Assets.WasapiAudio.Scripts.Unity
             Camera.main.transform.parent.Translate(new Vector3(0, 0, 1) * zSpacing);
             float newRms = rmsValue();
             newRms = Mathf.Lerp(m_curRms, newRms, 0.2F);
-            //Camera.main.fieldOfView = 60.0F + (newRms * fovScale);
+            Camera.main.fieldOfView = 88.0F + (newRms * fovScale);
             m_curRms = newRms;
         }
 
