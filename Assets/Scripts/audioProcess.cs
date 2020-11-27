@@ -203,6 +203,15 @@ namespace Assets.WasapiAudio.Scripts.Unity
                 m_triangles.Add(vertexIndex + width + 1);
             }
 
+            // Add last 2 triangles to connect cylinder
+            int startIdx = width * (curRow - 1);
+            m_triangles.Add(startIdx);
+            m_triangles.Add(startIdx + width + width - 1);
+            m_triangles.Add(startIdx + width);
+            m_triangles.Add(startIdx);
+            m_triangles.Add(startIdx + width - 1);
+            m_triangles.Add(startIdx + width + width - 1);
+
             m_mesh.triangles = m_triangles.ToArray();
             m_mesh.RecalculateNormals();
         }
@@ -211,7 +220,7 @@ namespace Assets.WasapiAudio.Scripts.Unity
         {
             Vector3 v = new Vector3(0, 0, 0);
             float cx = 0; float cy = 5;
-            float scaleFactor = 0.8f;
+            float scaleFactor = 1.3f;
             if (i < m_trueWidth)
             {
                 scaleFactor += Mathf.Exp(i - m_trueWidth);
@@ -234,7 +243,7 @@ namespace Assets.WasapiAudio.Scripts.Unity
             m_vertices.RemoveRange(0, width);
             m_amplitudes.RemoveRange(0, width);
             m_colors.RemoveRange(0, width);
-            m_triangles.RemoveRange(0, 6 * (width - 1)); // 6 points per tile
+            m_triangles.RemoveRange(0, 6 * width); // 6 points per tile
             for (int i = 0; i < m_triangles.Count; i++)
             {
                 m_triangles[i] -= width;
